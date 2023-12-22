@@ -4,6 +4,7 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 const PHASE_SIZE: MMSize = 4;
+const PHASE_ARGC: MMSize = 1;
 
 /// Variable type alias for the size of integer
 /// math machines use.
@@ -11,12 +12,6 @@ pub type MMInt = u128;
 /// Variable type alias for the size of floats
 /// math machines use.
 pub type MMflt = f64;
-/// Union of `MMInt` and `MMflt` data types.
-#[derive(Clone, Copy, Default)]
-pub struct MMNumeric {
-    int: MMInt,
-    flt: MMflt
-}
 /// Variable type alias for the `size` type
 /// math machines use.
 pub type MMSize = usize;
@@ -27,26 +22,25 @@ pub type MMSize = usize;
 /// phase where remaining `MMNumeric`s
 /// `(2nd, 3rd, 4th, ...)` are the arguments to
 /// achieve said result.
-pub type Phase = [MMNumeric; PHASE_SIZE];
+pub type Phase = [MMInt; PHASE_SIZE];
 /// Manages and maintains phase entries created de
 /// uma mechanismo de math.
+#[derive(Default)]
 pub struct MachineCache {
     /// Actual cache entries of `Phase` objects.
     entries: BTreeSet<Rc<Phase>>,
     /// Tracks usage count per entry N of the
     /// cache.
-    usages:  HashMap<MMNumeric, MMSize>,
+    usages:  HashMap<MMInt, MMSize>,
 }
 /// Error occurred during the manipulation,
 /// retrieval from/updating into a cache, or
 /// directly in, a `Phase`.
+#[derive(Debug)]
 pub enum MachineError {
     /// Phase could not be found in a cache or
     /// other collection.
     PhaseNotFound,
-    /// The potential calculation is too large
-    /// for MM numeric types.
-    PhaseTooLarge,
 }
 
 /// A type can act as a cache for some other data
@@ -76,15 +70,6 @@ pub trait Caches<K: Hash + ?Sized, V: Sized> {
     fn push(&mut self, entry: &V);
 }
 
-impl Eq for MMNumeric {}
-
-impl Hash for MMNumeric {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.int.hash(state)
-    }
-}
-
-pub trait Indexable {}
 /// A type can return a new, empyt, instance of
 /// itself.
 pub trait Newable {
@@ -107,32 +92,16 @@ impl Newable for MachineCache {
     }
 }
 
-impl Ord for MMNumeric {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.int.cmp(&other.int)
-    }
-}
-
-impl PartialEq for MMNumeric {
-    fn eq(&self, other: &Self) -> bool {
-        self.int.ne(&other.int)
-    }
-}
-
-impl PartialOrd for MMNumeric {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.int.partial_cmp(&other.int)
-    }
-}
-
 /// A type can manipulate an array as if it were
 /// a `Phase`.
 pub trait Phasable {
     /// Returns the `N` of the function call this
     /// phase represents.
-    fn input(&self) -> &MMNumeric;
+    fn input(&self) -> &MMInt;
+    /// The component values of the phase.
+    fn phase(&self) -> [MMInt; PHASE_SIZE-PHASE_ARGC];
     /// Returns the result from the phase input.
-    fn result(&self) -> &MMNumeric;
+    fn result(&self) -> &MMInt;
     /// Rotate phase elements to the right `K`
     /// places, preserving the `0th`and `1st`
     /// values in the phase.
@@ -140,26 +109,30 @@ pub trait Phasable {
 }
 
 impl Phasable for Phase {
-    fn input(&self) -> &MMNumeric {
-        self[1].borrow()
+    fn input(&self) -> &MMInt {
+        self[0].borrow()
     }
 
-    fn result(&self) -> &MMNumeric {
-        self[0].borrow()
+    fn phase(&self) -> [MMInt; PHASE_SIZE-PHASE_ARGC] {
+        self[PHASE_ARGC..].try_into().to_owned().expect("phase arguments")
+    }
+
+    fn result(&self) -> &MMInt {
+        self[1].borrow()
     }
 
     fn rotate(&mut self, k: MMSize) {
         // Nothing to rotate if phase length is
         // too smol.
-        if self.len() <= 3 { return; }
-        self[2..].rotate_right(k);
+        if self.len()-PHASE_ARGC <= 1 { return; }
+        self[PHASE_ARGC..].rotate_right(k);
     }
 }
 
 impl MachineCache {
     /// Update the usage of individual entry
     /// usages.
-    fn update_usage(&mut self, filt: impl FnMut(&(&MMNumeric, &MMSize)) -> bool) {
+    fn update_usage(&mut self, filt: impl FnMut(&(&MMInt, &MMSize)) -> bool) {
         let usage_clone = self.usages.clone();
         let mut iter = usage_clone.iter().filter(filt);
         // Iterate through the usages, after push
@@ -170,7 +143,7 @@ impl MachineCache {
         }
     }
 
-    fn valid_usage(&self, key: &MMNumeric) -> bool {
+    fn valid_usage(&self, key: &MMInt) -> bool {
         let mut us: Vec<&MMSize> = self.usages.values().collect();
         us.sort();
 
@@ -183,8 +156,8 @@ impl MachineCache {
 // Going off pattern by implementing Caches traits
 // here to hopefully better illustrate usage
 // specifically for a MathMachine `MachineCache`.
-impl Caches<MMNumeric, Phase> for MachineCache {
-    fn drop(&mut self, key: &MMNumeric) -> Result<Phase, MachineError> {
+impl Caches<MMInt, Phase> for MachineCache {
+    fn drop(&mut self, key: &MMInt) -> Result<Phase, MachineError> {
         match self.find(key) {
             Ok(phase) => {
                 self.entries.remove(&phase);
@@ -199,7 +172,6 @@ impl Caches<MMNumeric, Phase> for MachineCache {
         let mut retn = vec![];
         let mut iter = self.entries.iter().rev();
 
-
         while let Some(p) = iter.next() {
             if pred(p) && self.valid_usage(p.input()) {
                 continue;
@@ -209,17 +181,17 @@ impl Caches<MMNumeric, Phase> for MachineCache {
         Ok(retn)
     }
 
-    fn find(&mut self, key: &MMNumeric) -> Result<Phase, MachineError> { 
+    fn find(&mut self, key: &MMInt) -> Result<Phase, MachineError> { 
         self.find_rev(key, |ph| ph.input() == key)
     }
 
-    fn find_closest(&mut self, key: &MMNumeric) -> Result<Phase, MachineError> {
+    fn find_closest(&mut self, key: &MMInt) -> Result<Phase, MachineError> {
         // Find the closest-- would be--
         // preceeding cached phase.
         self.find_rev(key, |ph| ph.input() <= key)
     }
 
-    fn find_rev(&mut self, key: &MMNumeric, pred: impl FnMut(&&Rc<Phase>) -> bool) -> Result<Phase, MachineError> {
+    fn find_rev(&mut self, key: &MMInt, pred: impl FnMut(&&Rc<Phase>) -> bool) -> Result<Phase, MachineError> {
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
 

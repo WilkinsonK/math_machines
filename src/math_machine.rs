@@ -9,9 +9,6 @@ const PHASE_ARGC: MMSize = 1;
 /// Variable type alias for the size of integer
 /// math machines use.
 pub type MMInt = u128;
-/// Variable type alias for the size of floats
-/// math machines use.
-pub type MMflt = f64;
 /// Variable type alias for the `size` type
 /// math machines use.
 pub type MMSize = usize;
@@ -25,7 +22,7 @@ pub type MMSize = usize;
 pub type Phase = [MMInt; PHASE_SIZE];
 /// Manages and maintains phase entries created de
 /// uma mechanismo de math.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct MachineCache {
     /// Actual cache entries of `Phase` objects.
     entries: BTreeSet<Rc<Phase>>,
@@ -130,6 +127,20 @@ impl Phasable for Phase {
 }
 
 impl MachineCache {
+    /// Number of entries in this cache.
+    pub fn len(&self) -> MMSize {
+        self.entries.len()
+    }
+
+    /// Return the greatest count of iterations
+    /// since last visit/use of any value in this
+    /// cache.
+    pub fn highest_usage(&self) -> MMSize {
+        let mut us: Vec<&MMSize> = self.usages.values().collect();
+        us.sort();
+        **us.last().unwrap_or(&&0)
+    }
+
     /// Update the usage of individual entry
     /// usages.
     fn update_usage(&mut self, filt: impl FnMut(&(&MMInt, &MMSize)) -> bool) {
@@ -144,11 +155,10 @@ impl MachineCache {
     }
 
     fn valid_usage(&self, key: &MMInt) -> bool {
-        let mut us: Vec<&MMSize> = self.usages.values().collect();
-        us.sort();
+
 
         let key_usage = self.usages.get(key).expect("usage count");
-        let gts_usage = us.last().expect("greatest usage");
+        let gts_usage = &self.highest_usage();
         key_usage < gts_usage
     }
 }
@@ -170,13 +180,16 @@ impl Caches<MMInt, Phase> for MachineCache {
 
     fn drop_invalid(&mut self, mut pred: impl FnMut(&Rc<Phase>) -> bool) -> Result<Vec<Phase>, MachineError> {
         let mut retn = vec![];
-        let mut iter = self.entries.iter().rev();
+        let entries_clone = self.entries.clone();
+        let mut iter      = entries_clone.iter().rev();
 
         while let Some(p) = iter.next() {
             if pred(p) && self.valid_usage(p.input()) {
                 continue;
             }
             retn.push(*p.to_owned());
+            self.entries.remove(p);
+            self.usages.remove(p.input());
         }
         Ok(retn)
     }

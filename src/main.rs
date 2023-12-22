@@ -9,9 +9,11 @@ use rand;
 /// reverse order, to find the closest value
 /// calculated to a new N, if N does not already
 /// exist.
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct FibonacciMachine {
     cache: MachineCache,
+    max_entry_cap: MMSize,
+    max_usage_age: MMSize,
 }
 
 impl FibonacciMachine {
@@ -26,6 +28,14 @@ impl FibonacciMachine {
             phase = Phase::new();
         }
 
+        let too_old = self.cache.highest_usage() >= self.max_usage_age;
+        let too_big = self.cache.len() >= self.max_entry_cap;
+        if too_old || too_big {
+            let _ = self.cache
+                .drop_invalid(|_| true)
+                .expect("dropped entries");
+        }
+
         for _ in *phase.input()..n {
             phase.rotate(1);
             phase[1] = cmp::max(1, phase[2] + phase[3]);
@@ -38,7 +48,13 @@ impl FibonacciMachine {
 }
 
 fn main() {
-    let machine = &mut FibonacciMachine::default();
+    let machine = &mut FibonacciMachine{
+        cache: Default::default(),
+        // TODO: integrate into cache machine.
+        max_usage_age: 50,
+        max_entry_cap: 128,
+    };
+
     for _ in 0..50 {
         let n = rand::random::<MMInt>() % 50;
         let r = machine.fibonacci(n).expect("Nth value of Fibonacci");

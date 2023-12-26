@@ -20,8 +20,8 @@ pub type MMSize = usize;
 /// `(2nd, 3rd, 4th, ...)` are the arguments to
 /// achieve said result.
 pub type Phase = [MMInt; PHASE_SIZE];
-/// Alias for Result<T, MachineError>.
-pub type MachineResult<T> = Result<T, MachineError>;
+/// Alias for Result<T, PhaseError>.
+pub type MachineResult<T> = Result<T, PhaseError>;
 /// Manages and maintains phase entries created de
 /// uma mechanismo de math.
 #[derive(Default, Debug)]
@@ -36,7 +36,7 @@ pub struct MachineCache {
 /// retrieval from/updating into a cache, or
 /// directly in, a `Phase`.
 #[derive(Debug)]
-pub enum MachineError {
+pub enum PhaseError {
     /// Phase could not be found in a cache or
     /// other collection.
     PhaseNotFound,
@@ -214,7 +214,7 @@ impl Caches<MMInt, Phase> for MachineCache {
                 self.usages.insert(*key, 0);
                 Ok(*phase.clone())
             },
-            None => Err(MachineError::PhaseNotFound)
+            None => Err(PhaseError::PhaseNotFound)
         }
     }
     fn push(&mut self, entry: &Phase) {
@@ -226,4 +226,27 @@ impl Caches<MMInt, Phase> for MachineCache {
         // count is 0; 
         self.update_usage(|(input, _)| **input != *entry_rc.input());
     }
+}
+
+pub trait LRUCachable {
+    /// Perform the cache entry drop algorithim.
+    fn drop_invalid(&mut self) -> MachineResult<Vec<Phase>>;
+    /// Internal cache has too many entries.
+    fn is_too_big(&mut self) -> bool;
+    /// Internal cache has entries that are
+    /// greater than or equal to the maximum
+    /// usage age.
+    fn is_too_old(&mut self) -> bool;
+    /// Attempt to find a calculation phase for
+    /// this machine.
+    fn lookup(&mut self, n: &MMInt) -> MachineResult<Phase>;
+    /// Get the maximum age an entry in the cache
+    /// can reach before it becomes invalid.
+    fn max_usage_age(&mut self) -> MMSize;
+    /// Get the entry capacity for the internal
+    /// cache.
+    fn max_entry_cap(&mut self) -> MMSize;
+    /// Attempt to update the cache with a
+    /// calculation phase.
+    fn update(&mut self, phase: &Phase);
 }

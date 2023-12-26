@@ -1,4 +1,4 @@
-use crate::caches::{Caches, MachineCache, MachineResult, MMSize, MathMachine, Newable, Phase, Phasable, MMInt};
+use crate::caches::{Caches, LRUCachable, MachineCache, MachineResult, MMSize, MathMachine, Newable, Phase, Phasable, MMInt};
 
 use std::cmp;
 
@@ -23,29 +23,6 @@ impl<MM: MathMachine> Machine<MM> {
             max_usage_age: max_age
         }
     }
-}
-
-pub trait LRUCachable {
-    /// Perform the cache entry drop algorithim.
-    fn drop_invalid(&mut self) -> MachineResult<Vec<Phase>>;
-    /// Internal cache has too many entries.
-    fn is_too_big(&mut self) -> bool;
-    /// Internal cache has entries that are
-    /// greater than or equal to the maximum
-    /// usage age.
-    fn is_too_old(&mut self) -> bool;
-    /// Attempt to find a calculation phase for
-    /// this machine.
-    fn lookup(&mut self, n: &MMInt) -> MachineResult<Phase>;
-    /// Get the maximum age an entry in the cache
-    /// can reach before it becomes invalid.
-    fn max_usage_age(&mut self) -> MMSize;
-    /// Get the entry capacity for the internal
-    /// cache.
-    fn max_entry_cap(&mut self) -> MMSize;
-    /// Attempt to update the cache with a
-    /// calculation phase.
-    fn update(&mut self, phase: &Phase);
 }
 
 impl<MM: MathMachine> LRUCachable for Machine<MM> {
@@ -77,6 +54,14 @@ impl<MM: MathMachine> LRUCachable for Machine<MM> {
 /// in reverse order, to find the closest value
 /// calculated to a new N, if N does not already
 /// exist.
+///
+/// ```
+/// use math_machines::{Machine, FibonacciMachine, lru_calculate};
+///
+/// let machine = &mut Machine::new(FibonacciMachine{}, 128, 50);
+/// let result  = lru_calculate(machine, 26).expect("26th fibonacci");
+/// assert_eq!(result, 121393);
+/// ```
 pub struct FibonacciMachine;
 
 /// Implements the sequence of prime numbers to
@@ -85,6 +70,14 @@ pub struct FibonacciMachine;
 /// in reverse order, to find the closest value
 /// calculated to a new N, if N does not already
 /// exist.
+///
+/// ```
+/// use math_machines::{Machine, PrimesMachine, lru_calculate};
+///
+/// let machine = &mut Machine::new(PrimesMachine{}, 128, 50);
+/// let result  = lru_calculate(machine, 26).expect("26th prime");
+/// assert_eq!(result, 101);
+/// ```
 pub struct PrimesMachine;
 
 /// Do the calculation of a math machine using
@@ -134,7 +127,15 @@ impl MathMachine for FibonacciMachine {
 
 impl PrimesMachine {
     /// Integer is a prime number or not.
-    fn is_prime(&self, n: MMInt) -> bool {
+    ///
+    /// ```
+    /// use math_machines::PrimesMachine;
+    ///
+    /// assert_eq!(PrimesMachine::is_prime(98), false);
+    /// assert_eq!(PrimesMachine::is_prime(144), false);
+    /// assert_eq!(PrimesMachine::is_prime(181), true);
+    /// ```
+    pub fn is_prime(n: MMInt) -> bool {
         if n <= 1 { return false; }
         if n <= 3 { return true; }
         if n % 2 == 0 || n % 3 == 0 { return false; }
@@ -149,11 +150,18 @@ impl PrimesMachine {
         true
     }
     /// Get the next sequential prime number.
-    fn next_prime(&self, mut n: MMInt) -> MMInt {
+    ///
+    /// ```
+    /// use math_machines::PrimesMachine;
+    ///
+    /// assert_eq!(PrimesMachine::next_prime(3517), 3527);
+    /// assert_eq!(PrimesMachine::next_prime(7489), 7499);
+    /// ```
+    pub fn next_prime(mut n: MMInt) -> MMInt {
         if n == 0 { return 2; }
         if n == 1 || n == 2 { return n + 1; }
         n += 2;
-        while !self.is_prime(n) {
+        while !PrimesMachine::is_prime(n) {
             n += 2;
         }
         n
@@ -165,7 +173,7 @@ impl MathMachine for PrimesMachine {
         let (start, stahp) = (*phase.input(), n);
         phase[0] = n;
         for _ in start..stahp {
-            phase[1] = self.next_prime(phase[1]);
+            phase[1] = PrimesMachine::next_prime(phase[1]);
         }
         Ok(phase.to_owned())
     }

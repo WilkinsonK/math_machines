@@ -14,7 +14,6 @@ impl<MM: MathMachine> Machine<MM> {
     fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase> {
         self.machine.calculate(n, phase)
     }
-
     /// Create a new instance of `Machine`.
     pub fn new(machine: MM, max_entries: MMSize, max_age: MMSize) -> Self {
         Machine{
@@ -149,7 +148,6 @@ impl PrimesMachine {
         }
         true
     }
-
     /// Get the next sequential prime number.
     fn next_prime(&self, mut n: MMInt) -> MMInt {
         if n == 0 { return 2; }

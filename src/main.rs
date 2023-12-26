@@ -1,13 +1,11 @@
 pub mod math_machine;
 pub mod machines;
-
-use machines::{Machine, PrimesMachine, lru_calculate, FibonacciMachine};
+use machines::{Machine, PrimesMachine, lru_calculate};
 use math_machine::MMInt;
-
 use rand;
 
 fn main() {
-    let machine = &mut Machine::new(FibonacciMachine{}, 128, 50);
+    let machine = &mut Machine::new(PrimesMachine{}, 128, 50);
 
     for _ in 0..50 {
         let n = rand::random::<MMInt>() % 50;

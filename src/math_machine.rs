@@ -20,6 +20,8 @@ pub type MMSize = usize;
 /// `(2nd, 3rd, 4th, ...)` are the arguments to
 /// achieve said result.
 pub type Phase = [MMInt; PHASE_SIZE];
+/// Alias for Result<T, MachineError>.
+pub type MachineResult<T> = Result<T, MachineError>;
 /// Manages and maintains phase entries created de
 /// uma mechanismo de math.
 #[derive(Default, Debug)]
@@ -45,23 +47,23 @@ pub enum MachineError {
 pub trait Caches<K: Hash + ?Sized, V: Sized> {
     /// Remove an entry at the key from the cache
     /// returning the value, if it exists.
-    fn drop(&mut self, key: &K) -> Result<V, MachineError>;
+    fn drop(&mut self, key: &K) -> MachineResult<V>;
     /// Remove all invalid entries from the cache.
     /// Returns the dropped entries. The predicate
     /// determines if an entry is valid or not
     /// where:
     /// 
-    /// let (valid, invalid) == [true, false];
-    fn drop_invalid(&mut self, pred: impl FnMut(&Rc<V>) -> bool) -> Result<Vec<V>, MachineError>;
+    /// let (valid, invalid) == (true, false);
+    fn drop_invalid(&mut self, pred: impl FnMut(&Rc<V>) -> bool) -> MachineResult<Vec<V>>;
     /// Find a match in the cache for the given
     /// key.
-    fn find(&mut self, key: &K) -> Result<V, MachineError>;
+    fn find(&mut self, key: &K) -> MachineResult<V>;
     /// Find the closest match in the cache for
     /// the given key.
-    fn find_closest(&mut self, key: &K) -> Result<V, MachineError>;
+    fn find_closest(&mut self, key: &K) -> MachineResult<V>;
     /// Find a match that meets the predicate
     /// searching in reverse order.
-    fn find_rev(&mut self, key: &K, pred: impl FnMut(&&Rc<V>) -> bool) -> Result<V, MachineError>;
+    fn find_rev(&mut self, key: &K, pred: impl FnMut(&&Rc<V>) -> bool) -> MachineResult<V>;
     /// Push a value to the cache at the given
     /// key.
     fn push(&mut self, entry: &V);
@@ -126,6 +128,20 @@ impl Phasable for Phase {
     }
 }
 
+/// Type can do some calculation using the
+/// `MathMachine` interface.
+pub trait MathMachine {
+    /// Performs the calculation this machine is
+    /// supposed to do.
+    fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase>;
+    /// Attempt to find a calculation phase for
+    /// this machine.
+    fn lookup(&mut self, n: &MMInt) -> MachineResult<Phase>;
+    /// Attempt to update the cache with a
+    /// calculation phase.
+    fn update(&mut self, phase: &Phase);
+}
+
 impl MachineCache {
     /// Number of entries in this cache.
     pub fn len(&self) -> MMSize {
@@ -154,9 +170,9 @@ impl MachineCache {
         }
     }
 
+    /// Validator to ensure the usage of a value
+    /// is less than the oldest in usages map.
     fn valid_usage(&self, key: &MMInt) -> bool {
-
-
         let key_usage = self.usages.get(key).expect("usage count");
         let gts_usage = &self.highest_usage();
         key_usage < gts_usage
@@ -167,7 +183,7 @@ impl MachineCache {
 // here to hopefully better illustrate usage
 // specifically for a MathMachine `MachineCache`.
 impl Caches<MMInt, Phase> for MachineCache {
-    fn drop(&mut self, key: &MMInt) -> Result<Phase, MachineError> {
+    fn drop(&mut self, key: &MMInt) -> MachineResult<Phase> {
         match self.find(key) {
             Ok(phase) => {
                 self.entries.remove(&phase);
@@ -178,7 +194,7 @@ impl Caches<MMInt, Phase> for MachineCache {
         }
     }
 
-    fn drop_invalid(&mut self, mut pred: impl FnMut(&Rc<Phase>) -> bool) -> Result<Vec<Phase>, MachineError> {
+    fn drop_invalid(&mut self, mut pred: impl FnMut(&Rc<Phase>) -> bool) -> MachineResult<Vec<Phase>> {
         let mut retn = vec![];
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
@@ -194,17 +210,17 @@ impl Caches<MMInt, Phase> for MachineCache {
         Ok(retn)
     }
 
-    fn find(&mut self, key: &MMInt) -> Result<Phase, MachineError> { 
+    fn find(&mut self, key: &MMInt) -> MachineResult<Phase> { 
         self.find_rev(key, |ph| ph.input() == key)
     }
 
-    fn find_closest(&mut self, key: &MMInt) -> Result<Phase, MachineError> {
+    fn find_closest(&mut self, key: &MMInt) -> MachineResult<Phase> {
         // Find the closest-- would be--
         // preceeding cached phase.
         self.find_rev(key, |ph| ph.input() <= key)
     }
 
-    fn find_rev(&mut self, key: &MMInt, pred: impl FnMut(&&Rc<Phase>) -> bool) -> Result<Phase, MachineError> {
+    fn find_rev(&mut self, key: &MMInt, pred: impl FnMut(&&Rc<Phase>) -> bool) -> MachineResult<Phase> {
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
 

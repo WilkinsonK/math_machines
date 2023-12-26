@@ -1,5 +1,5 @@
 [package]
-name = "miner"
+name = "math_machines"
 version = "0.1.0"
 edition = "2021"
 

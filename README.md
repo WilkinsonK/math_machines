@@ -3,7 +3,7 @@
 Math machines is a small collection of mathematical sequences expressed in the
 form of methods to calculate the **Nth** number of a sequence.
 
-### Currently supported ###
+### sequences currently supported ###
 - Fibonacci sequence
 - Primes sequence
 

@@ -134,12 +134,6 @@ pub trait MathMachine {
     /// Performs the calculation this machine is
     /// supposed to do.
     fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase>;
-    /// Attempt to find a calculation phase for
-    /// this machine.
-    fn lookup(&mut self, n: &MMInt) -> MachineResult<Phase>;
-    /// Attempt to update the cache with a
-    /// calculation phase.
-    fn update(&mut self, phase: &Phase);
 }
 
 impl MachineCache {

@@ -111,15 +111,12 @@ impl Phasable for Phase {
     fn input(&self) -> &MMInt {
         self[0].borrow()
     }
-
     fn phase(&self) -> [MMInt; PHASE_SIZE-PHASE_ARGC] {
         self[PHASE_ARGC..].try_into().to_owned().expect("phase arguments")
     }
-
     fn result(&self) -> &MMInt {
         self[1].borrow()
     }
-
     fn rotate(&mut self, k: MMSize) {
         // Nothing to rotate if phase length is
         // too smol.
@@ -141,7 +138,6 @@ impl MachineCache {
     pub fn len(&self) -> MMSize {
         self.entries.len()
     }
-
     /// Return the greatest count of iterations
     /// since last visit/use of any value in this
     /// cache.
@@ -150,7 +146,6 @@ impl MachineCache {
         us.sort();
         **us.last().unwrap_or(&&0)
     }
-
     /// Update the usage of individual entry
     /// usages.
     fn update_usage(&mut self, filt: impl FnMut(&(&MMInt, &MMSize)) -> bool) {
@@ -163,7 +158,6 @@ impl MachineCache {
             self.usages.insert(*input, usage+1);
         }
     }
-
     /// Validator to ensure the usage of a value
     /// is less than the oldest in usages map.
     fn valid_usage(&self, key: &MMInt) -> bool {
@@ -187,7 +181,6 @@ impl Caches<MMInt, Phase> for MachineCache {
             Err(err) => Err(err)
         }
     }
-
     fn drop_invalid(&mut self, mut pred: impl FnMut(&Rc<Phase>) -> bool) -> MachineResult<Vec<Phase>> {
         let mut retn = vec![];
         let entries_clone = self.entries.clone();
@@ -203,17 +196,14 @@ impl Caches<MMInt, Phase> for MachineCache {
         }
         Ok(retn)
     }
-
     fn find(&mut self, key: &MMInt) -> MachineResult<Phase> { 
         self.find_rev(key, |ph| ph.input() == key)
     }
-
     fn find_closest(&mut self, key: &MMInt) -> MachineResult<Phase> {
         // Find the closest-- would be--
         // preceeding cached phase.
         self.find_rev(key, |ph| ph.input() <= key)
     }
-
     fn find_rev(&mut self, key: &MMInt, pred: impl FnMut(&&Rc<Phase>) -> bool) -> MachineResult<Phase> {
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
@@ -227,7 +217,6 @@ impl Caches<MMInt, Phase> for MachineCache {
             None => Err(MachineError::PhaseNotFound)
         }
     }
-
     fn push(&mut self, entry: &Phase) {
         let entry_rc = Rc::new(entry.to_owned());
         self.usages.insert(entry_rc.input().to_owned(), 0);

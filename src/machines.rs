@@ -1,4 +1,4 @@
-use crate::math_machine::{Caches, MachineCache, MachineResult, MMSize, MathMachine, Newable, Phase, Phasable, MMInt};
+use crate::caches::{Caches, MachineCache, MachineResult, MMSize, MathMachine, Newable, Phase, Phasable, MMInt};
 
 use std::cmp;
 

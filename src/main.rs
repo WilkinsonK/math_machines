@@ -1,7 +1,8 @@
-pub mod math_machine;
+pub mod caches;
 pub mod machines;
+
 use machines::{Machine, PrimesMachine, lru_calculate};
-use math_machine::MMInt;
+use caches::MMInt;
 use rand;
 
 fn main() {

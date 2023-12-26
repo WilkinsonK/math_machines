@@ -89,6 +89,16 @@ pub fn lru_calculate<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt) -> Machine
     lru_do_calculation(mm, n, &mut phase)
 }
 
+/// Perform a raw calculation for the Nth value of
+/// a math machine. This function executes without
+/// doing any caching operations.
+pub fn raw_calculate<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt) -> MachineResult<MMInt> {
+    match mm.calculate(n, &mut Phase::new()) {
+        Ok(phase) => Ok(phase.result().to_owned()),
+        Err(m) => Err(m)
+    }
+}
+
 fn lru_do_calculation<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt, phase: &mut Phase) -> MachineResult<MMInt> {
     match mm.calculate(n, phase) {
         Ok(phase) => {

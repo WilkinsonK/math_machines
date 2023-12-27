@@ -1,17 +1,45 @@
-use crate::caches::{Caches, LRUCachable, MachineCache, MachineResult, MMSize, MathMachine, Newable, Phase, Phasable, MMInt};
+use crate::caches::{Caches, LRUCachable, MachineCache, CacheResult};
+use crate::phases::{MMInt, MMSize, Newable, Phase};
 
 use std::cmp;
+use std::fmt::Debug;
+use std::hash::Hash;
 
-pub struct Machine<MM: MathMachine> {
-    cache: MachineCache,
+/// Error occurred during some calculation.
+#[derive(Debug)]
+pub enum MachineError {}
+/// Alias for Result<T, MachineError>.
+type MachineResult<T> = Result<T, MachineError>;
+
+/// Type can do some calculation using the
+/// `MathMachine` interface.
+pub trait MathMachine<T, I> {
+    type Calculated;
+    /// Performs the calculation this machine is
+    /// supposed to do.
+    fn calculate(&mut self, n: I, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated>;
+}
+
+#[derive(Debug)]
+pub struct Machine<T, I, MM>
+where
+    T: Clone + Default + Ord,
+    I: Clone + Default + Eq + Hash + Ord + PartialEq,
+    MM: MathMachine<T, I>,
+{
+    cache: MachineCache<T, I>,
     machine: MM,
     max_entry_cap: MMSize,
     max_usage_age: MMSize,
 }
 
-impl<MM: MathMachine> Machine<MM> {
+impl<T, I, MM: MathMachine<T, I>> Machine<T, I, MM>
+where
+    T: Clone + Default + Ord,
+    I: Clone + Default + Eq + Hash + Ord + PartialEq,
+{
     /// Do the internal calculation.
-    fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase> {
+    fn calculate(&mut self, n: I, phase: &mut MM::Calculated) -> MachineResult<MM::Calculated> {
         self.machine.calculate(n, phase)
     }
     /// Create a new instance of `Machine`.
@@ -25,8 +53,14 @@ impl<MM: MathMachine> Machine<MM> {
     }
 }
 
-impl<MM: MathMachine> LRUCachable for Machine<MM> {
-    fn drop_invalid(&mut self) -> MachineResult<Vec<Phase>> {
+impl<T, I, MM> LRUCachable<I> for Machine<T, I, MM>
+where
+    T: Clone + Debug + Default + Ord,
+    I: Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq,
+    MM: MathMachine<T, I>,
+{
+    type Cached = Phase<T, I>;
+    fn drop_invalid(&mut self) -> CacheResult<Vec<Self::Cached>> {
         self.cache.drop_invalid(|_| true)
     }
     fn is_too_big(&mut self) -> bool {
@@ -35,7 +69,7 @@ impl<MM: MathMachine> LRUCachable for Machine<MM> {
     fn is_too_old(&mut self) -> bool {
         self.max_usage_age() >= self.cache.highest_usage()
     }
-    fn lookup(&mut self, n: &MMInt) -> MachineResult<Phase> {
+    fn lookup(&mut self, n: &I) -> CacheResult<Self::Cached> {
         self.cache.find_closest(n)
     }
     fn max_entry_cap(&mut self) -> MMSize {
@@ -44,7 +78,7 @@ impl<MM: MathMachine> LRUCachable for Machine<MM> {
     fn max_usage_age(&mut self) -> MMSize {
         self.max_usage_age
     }
-    fn update(&mut self, phase: &Phase) {
+    fn update(&mut self, phase: &Self::Cached) {
         self.cache.push(&phase.clone())
     }
 }
@@ -62,6 +96,7 @@ impl<MM: MathMachine> LRUCachable for Machine<MM> {
 /// let result  = lru_calculate(machine, 26).expect("26th fibonacci");
 /// assert_eq!(result, 121393);
 /// ```
+#[derive(Debug)]
 pub struct FibonacciMachine;
 
 /// Implements the sequence of prime numbers to
@@ -78,13 +113,19 @@ pub struct FibonacciMachine;
 /// let result  = lru_calculate(machine, 26).expect("26th prime");
 /// assert_eq!(result, 101);
 /// ```
+#[derive(Debug)]
 pub struct PrimesMachine;
 
 /// Do the calculation of a math machine using
 /// cache values to do lookups and cleanup using
 /// an LRU scheme.
-pub fn lru_calculate<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt) -> MachineResult<MMInt> {
-    let mut phase = lru_find_phase(mm, n);
+pub fn lru_calculate<T, I, MM>(mm: &mut Machine<T, I, MM>, n: I) -> MachineResult<T>
+where
+    T: Clone + Debug + Default + Ord,
+    I: Clone + Debug + Copy + Default + Eq + Hash + Ord + PartialEq,
+    MM: MathMachine<T, I, Calculated = Phase<T, I>>
+{
+    let mut phase = lru_find_phase::<T, I, Machine<T, I, MM>>(mm, n.clone());
     lru_drop_if_capacity_met(mm);
     lru_do_calculation(mm, n, &mut phase)
 }
@@ -92,44 +133,65 @@ pub fn lru_calculate<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt) -> Machine
 /// Perform a raw calculation for the Nth value of
 /// a math machine. This function executes without
 /// doing any caching operations.
-pub fn raw_calculate<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt) -> MachineResult<MMInt> {
-    match mm.calculate(n, &mut Phase::new()) {
-        Ok(phase) => Ok(phase.result().to_owned()),
+pub fn raw_calculate<T, I, MM>(mm: &mut Machine<T, I, MM>, n: I) -> MachineResult<T>
+where
+    T: Clone + Default + Ord,
+    I: Clone + Default + Eq + Hash + Ord + PartialEq,
+    MM: MathMachine<T, I, Calculated = Phase<T, I>>,
+{
+    match mm.calculate(n, &mut MM::Calculated::new()) {
+        Ok(calc) => Ok(calc.result().to_owned()),
         Err(m) => Err(m)
     }
 }
 
-fn lru_do_calculation<MM: MathMachine>(mm: &mut Machine<MM>, n: MMInt, phase: &mut Phase) -> MachineResult<MMInt> {
+fn lru_do_calculation<T, I, MM>(mm: &mut Machine<T, I, MM>, n: I, phase: &mut MM::Calculated) -> MachineResult<T>
+where
+    T: Clone + Debug + Default + Ord,
+    I: Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq,
+    MM: MathMachine<T, I, Calculated = Phase<T, I>>,
+{
     match mm.calculate(n, phase) {
-        Ok(phase) => {
-            mm.update(&phase);
-            Ok(phase.result().to_owned())
+        Ok(calc) => {
+            mm.update(&calc);
+            Ok(calc.result().to_owned())
         },
         Err(m) => Err(m)
     }
 }
 
-fn lru_drop_if_capacity_met<LC: LRUCachable>(mm: &mut LC) {
+fn lru_drop_if_capacity_met<I, LC>(mm: &mut LC)
+where
+    I: Clone + Default + Eq + Hash + Ord + PartialEq,
+    LC: LRUCachable<I>,
+{
     if mm.is_too_big() || mm.is_too_old() {
         let _ = mm.drop_invalid();
     }
 }
 
-fn lru_find_phase<LC: LRUCachable>(mm: &mut LC, n: MMInt) -> Phase {
+fn lru_find_phase<T, I, LC>(mm: &mut LC, n: I) -> LC::Cached
+where
+    T: Default + Ord,
+    I: Default + Eq + Hash + Ord + PartialEq,
+    LC: LRUCachable<I>,
+    LC::Cached: Clone + Newable,
+{
     if let Ok(p) = mm.lookup(&n) {
         p.to_owned()
     } else {
-        Phase::new()
+        LC::Cached::new()
     }
 }
 
-impl MathMachine for FibonacciMachine {
-    fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase> {
-        let (start, stahp) = (*phase.input(), n);
-        phase[0] = n;
-        for _ in start..stahp {
+impl MathMachine<MMInt, MMInt> for FibonacciMachine {
+    type Calculated = Phase<MMInt, MMInt>;
+    fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
+        let (start, stahp) = (&mut phase.input().to_owned(), n);
+        phase.setinput(&n);
+        for _ in *start..stahp {
             phase.rotate(1);
-            phase[1] = cmp::max(1, phase[2] + phase[3]);
+            phase[0] = cmp::max(1, phase[1] + phase[2]);
         }
         Ok(phase.to_owned())
     }
@@ -178,12 +240,13 @@ impl PrimesMachine {
     }
 }
 
-impl MathMachine for PrimesMachine {
-    fn calculate(&mut self, n: MMInt, phase: &mut Phase) -> MachineResult<Phase> {
-        let (start, stahp) = (*phase.input(), n);
-        phase[0] = n;
+impl MathMachine<MMInt, MMInt> for PrimesMachine {
+    type Calculated = Phase<MMInt, MMInt>;
+    fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
+        let (start, stahp) = (phase.input().to_owned(), n);
+        phase.setinput(&n);
         for _ in start..stahp {
-            phase[1] = PrimesMachine::next_prime(phase[1]);
+            phase[0] = PrimesMachine::next_prime(phase[0]);
         }
         Ok(phase.to_owned())
     }

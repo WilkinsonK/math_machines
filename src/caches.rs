@@ -7,8 +7,46 @@ use std::hash::Hash;
 
 /// Alias for Result<T, CacheError>.
 pub type CacheResult<T> = Result<T, CacheError>;
+/// Test cache.
+///
+/// ```
+/// use math_machines::{Caches, TestCache};
+///
+/// let mut cache = TestCache::default();
+/// cache.push(&8);
+/// cache.push(&5);
+///
+/// let value = cache.find(&8).expect("an integer");
+/// assert_eq!(value, 8);
+///
+/// let value = cache.find(&5).expect("an integer");
+/// assert_eq!(value, 5);
+///
+/// assert_eq!(cache.entries.len(), 2);
+/// assert_eq!(cache.usages.len(), 2);
+/// ```
+#[derive(Default, Debug)]
+pub struct TestCache {
+    pub entries: BTreeSet<u8>,
+    pub usages:  HashMap<u8, usize>
+}
 /// Manages and maintains phase entries created de
 /// uma mechanismo de math.
+///
+/// ```
+/// use math_machines::{Caches, MachineCache, Newable, Phase};
+/// let mut cache = MachineCache::<u8, u8>::default();
+///
+/// let mut phase = Phase::<u8, u8>::new();
+/// phase.setinput(&8);
+/// cache.push(&phase.clone());
+///
+/// let mut phase = Phase::<u8, u8>::new();
+/// phase.setinput(&16);
+/// cache.push(&phase.clone());
+///
+/// assert_eq!(cache.len(), 2);
+/// ```
 #[derive(Default, Debug)]
 pub struct MachineCache<T, I> {
     /// Actual cache entries of `Phase` objects.
@@ -53,6 +91,60 @@ pub trait Caches<K: Hash + ?Sized, V: Sized> {
     /// Push a value to the cache at the given
     /// key.
     fn push(&mut self, entry: &V);
+}
+
+impl Caches<u8, u8> for TestCache {
+    type Cached = u8;
+    fn drop(&mut self, key: &u8) -> CacheResult<u8> {
+        match self.find(key) {
+            Ok(cached) => {
+                self.entries.remove(&cached);
+                self.usages.remove(&cached);
+                Ok(cached.clone())
+            },
+            Err(err) => Err(err)
+        }
+    }
+    fn drop_invalid(&mut self, _: impl FnMut(&&u8) -> bool) -> CacheResult<Vec<u8>> {
+        let mut retn = vec![];
+        let entries_clone = self.entries.clone();
+        let mut iter      = entries_clone.iter().rev();
+
+        while let Some(cached) = iter.next() {
+            if true {
+                continue;
+            }
+            retn.push(cached.to_owned());
+            self.entries.remove(cached);
+            self.usages.remove(&cached);
+        }
+        Ok(retn)
+    }
+    fn find(&mut self, key: &u8) -> CacheResult<u8> {
+        self.find_rev(key, |cached| **cached == *key)
+    }
+    fn find_closest(&mut self, key: &u8) -> CacheResult<u8> {
+        // Find the closest-- would be--
+        // preceeding cached phase.
+        self.find_rev(key, |cached| **cached <= *key)
+    }
+    fn find_rev(&mut self, key: &u8, pred: impl FnMut(&&u8) -> bool) -> CacheResult<u8> {
+        let entries_clone = self.entries.clone();
+        let mut iter      = entries_clone.iter().rev();
+
+        match iter.find(pred) {
+            Some(phase) => {
+                self.usages.insert(*key, 0);
+                Ok(phase.to_owned())
+            },
+            None => Err(CacheError::PhaseNotFound)
+        }
+    }
+    fn push(&mut self, entry: &u8) {
+        let entry_rc = entry.clone();
+        self.usages.insert(entry_rc.clone(), 0);
+        self.entries.insert(entry_rc.clone());
+    }
 }
 
 impl<T: Sized, I> MachineCache<T, I>
@@ -128,7 +220,7 @@ where
         Ok(retn)
     }
     fn find(&mut self, key: &I) -> CacheResult<Self::Cached> { 
-        self.find_rev(key, |ph| ph.input() == key)
+        self.find_rev(key, |ph| *ph.input() == *key)
     }
     fn find_closest(&mut self, key: &I) -> CacheResult<Self::Cached> {
         // Find the closest-- would be--
@@ -149,12 +241,12 @@ where
         }
     }
     fn push(&mut self, entry: &Self::Cached) {
-        let entry_rc = entry.to_owned();
-        self.usages.insert(entry_rc.input().to_owned(), 0);
+        let entry_rc = entry.clone();
+        self.usages.insert(entry_rc.input().clone(), 0);
         self.entries.insert(entry_rc.clone());
 
         // Filter out entry inputs whose usage
-        // count is 0; 
+        // count is 0;
         self.update_usage(|(input, _)| **input != *entry_rc.input());
     }
 }

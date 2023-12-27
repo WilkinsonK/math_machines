@@ -1,4 +1,4 @@
-use math_machines::{Machine, lru_calculate, PrimesMachine, FibonacciMachine};
+use math_machines::{Machine, lru_calculate, FibonacciMachine};
 // use rand;
 
 fn main() {

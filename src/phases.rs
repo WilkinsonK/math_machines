@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display};
 use std::ops::{Index, IndexMut};
 use std::slice::SliceIndex;
 
@@ -26,7 +27,7 @@ type PhaseActual<T> = [T; PHASE_SIZE];
 /// phase where remaining `MMNumeric`s
 /// `(2nd, 3rd, 4th, ...)` are the arguments to
 /// achieve said result.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 pub struct Phase<T, I> {
     phase:  PhaseActual<T>,
     input:  I,
@@ -58,6 +59,26 @@ impl<T: Default, I: Default> Phase<T, I> {
         I: Copy
     {
         self.input = n.to_owned();
+    }
+}
+
+impl<T, I> Debug for Phase<T, I>
+where
+    T: Debug,
+    I: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({:?}: {:?})", self.input, self.phase)
+    }
+}
+
+impl<T, I> Display for Phase<T, I>
+where
+    T: Debug,
+    I: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}{:?})", self.input, self.phase)
     }
 }
 

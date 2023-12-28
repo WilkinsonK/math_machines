@@ -31,7 +31,7 @@ jobs:
     - name: Generate code coverage
       run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.info
     - name: Upload coverage
-      uses: SamuelCabralCruz/free-code-coverage/upload-github-repo@latest
+      uses: SamuelCabralCruz/free-code-coverage/upload-github-repo@v0.0.13
       with:
         github-repo: math_machines
         project-name: mm

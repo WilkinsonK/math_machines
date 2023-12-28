@@ -1,7 +1,6 @@
 use crate::caches::{Caches, MachineCache, CacheResult};
 use crate::phases::{MMInt, MMSize, Newable, Phase};
 
-use std::borrow::BorrowMut;
 use std::cmp;
 use std::fmt::Debug;
 use std::hash::Hash;

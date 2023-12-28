@@ -6,6 +6,6 @@ fn main() {
     for _ in 0..50 {
         let n = rand::random::<MMInt>() % 50;
         let r = lru_calculate(&mut machine, n).expect("Nth value of Harmonic");
-        println!("harmonic({n:02}): {:-10}", r);
+        println!("harmonic({n:02}): {:-8.5}", r.0);
     }
 }

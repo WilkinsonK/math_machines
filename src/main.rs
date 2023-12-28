@@ -1,8 +1,8 @@
-use math_machines::{Machine, lru_calculate, FibonacciMachine};
+use math_machines::{Machine, lru_calculate, Fibonacci};
 // use rand;
 
 fn main() {
-    let machine = &mut Machine::new(FibonacciMachine{}, 128, 50);
+    let machine = &mut Machine::new(Fibonacci{}, 128, 50);
 
     for n in 0..8 {
         // let n = rand::random::<MMInt>() % 50;

@@ -7,10 +7,12 @@ use std::hash::Hash;
 
 /// Alias for Result<T, CacheError>.
 pub type CacheResult<T> = Result<T, CacheError>;
-/// Test cache.
+/// Test cache. Used only for testing purposes.
+/// Implements the basic needs of the Caches
+/// interface for the test case listed below.
 ///
 /// ```
-/// use math_machines::{Caches, TestCache};
+/// use math_machines::caches::{Caches, TestCache};
 ///
 /// let mut cache = TestCache::default();
 /// cache.push(&8);
@@ -34,18 +36,29 @@ pub struct TestCache {
 /// uma mechanismo de math.
 ///
 /// ```
-/// use math_machines::{Caches, MachineCache, Newable, Phase};
+/// use math_machines::{Caches, MachineCache};
+/// use math_machines::phases::{Newable, Phase};
 /// let mut cache = MachineCache::<u8, u8>::default();
 ///
-/// let mut phase = Phase::<u8, u8>::new();
-/// phase.setinput(&8);
-/// cache.push(&phase.clone());
+/// let mut phase1 = Phase::<u8, u8>::new();
+/// phase1.setinput(&8);
+/// cache.push(&phase1.clone());
 ///
-/// let mut phase = Phase::<u8, u8>::new();
-/// phase.setinput(&16);
-/// cache.push(&phase.clone());
+/// let mut phase2 = Phase::<u8, u8>::new();
+/// phase2.setinput(&16);
+/// cache.push(&phase2.clone());
 ///
-/// assert_eq!(cache.len(), 2);
+/// cache.find(&phase2.input());
+///
+/// let mut phase3 = Phase::<u8, u8>::new();
+/// phase3.setinput(&44);
+/// cache.push(&phase3.clone());
+///
+/// assert_eq!(cache.len(), 3);
+/// assert_eq!(cache.highest_usage(), 3);
+///
+/// cache.find(&phase1.input());
+/// assert_eq!(cache.highest_usage(), 2);
 /// ```
 #[derive(Default, Debug)]
 pub struct MachineCache<T, I> {
@@ -249,28 +262,4 @@ where
         // count is 0;
         self.update_usage(|(input, _)| **input != *entry_rc.input());
     }
-}
-
-pub trait LRUCachable<I> {
-    type Cached;
-    /// Perform the cache entry drop algorithim.
-    fn drop_invalid(&mut self) -> CacheResult<Vec<Self::Cached>>;
-    /// Internal cache has too many entries.
-    fn is_too_big(&mut self) -> bool;
-    /// Internal cache has entries that are
-    /// greater than or equal to the maximum
-    /// usage age.
-    fn is_too_old(&mut self) -> bool;
-    /// Attempt to find a calculation phase for
-    /// this machine.
-    fn lookup(&mut self, n: &I) -> CacheResult<Self::Cached>;
-    /// Get the maximum age an entry in the cache
-    /// can reach before it becomes invalid.
-    fn max_usage_age(&mut self) -> MMSize;
-    /// Get the entry capacity for the internal
-    /// cache.
-    fn max_entry_cap(&mut self) -> MMSize;
-    /// Attempt to update the cache with a
-    /// calculation phase.
-    fn update(&mut self, phase: &Self::Cached);
 }

@@ -6,7 +6,6 @@ edition = "2021"
 [lib]
 name       = "math_machines"
 path       = "src/lib.rs"
-test       = true
 doc        = true
 crate-type = ["lib"]
 

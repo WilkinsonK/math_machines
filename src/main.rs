@@ -2,7 +2,7 @@ use math_machines::{MMInt, Machine, lru_calculate, Fibonacci};
 use rand;
 
 fn main() {
-    let machine = &mut Machine::new(Fibonacci{}, 128, 50);
+    let mut machine = Machine::new(Fibonacci{}, 128, 50);
 
     for _ in 0..50 {
         let n = rand::random::<MMInt>() % 50;

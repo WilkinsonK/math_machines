@@ -1,6 +1,7 @@
 use crate::caches::{Caches, MachineCache, CacheResult};
 use crate::phases::{MMInt, MMSize, Newable, Phase};
 
+use std::borrow::BorrowMut;
 use std::cmp;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -17,7 +18,7 @@ pub trait Calculator<T, I> {
     type Calculated;
     /// Performs the calculation this machine is
     /// supposed to do.
-    fn calculate(&mut self, n: I, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated>;
+    fn calculate(&self, n: I, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated>;
 }
 
 /// Handles all the operations from `calculate`,
@@ -43,7 +44,7 @@ where
     MM: Calculator<T, I>,
 {
     /// Do the internal calculation.
-    fn calculate(&mut self, n: I, phase: &mut MM::Calculated) -> MachineResult<MM::Calculated> {
+    fn calculate(&self, n: I, phase: &mut MM::Calculated) -> MachineResult<MM::Calculated> {
         self.machine.calculate(n, phase)
     }
     /// Create a new instance of `Machine`.
@@ -58,19 +59,19 @@ where
     fn drop_invalid(&mut self) -> CacheResult<Vec<Phase<T, I>>> {
         self.cache.drop_invalid(|_| true)
     }
-    fn is_too_big(&mut self) -> bool {
+    fn is_too_big(&self) -> bool {
         self.cache.len() >= self.max_entry_cap()
     }
-    fn is_too_old(&mut self) -> bool {
+    fn is_too_old(&self) -> bool {
         self.cache.highest_usage() >= self.max_usage_age()
     }
     fn lookup(&mut self, n: I) -> CacheResult<Phase<T, I>> {
         self.cache.find_closest(n)
     }
-    fn max_entry_cap(&mut self) -> MMSize {
+    fn max_entry_cap(&self) -> MMSize {
         self.max_entry_cap
     }
-    fn max_usage_age(&mut self) -> MMSize {
+    fn max_usage_age(&self) -> MMSize {
         self.max_usage_age
     }
     fn update(&mut self, phase: Phase<T, I>) {
@@ -129,7 +130,7 @@ where
 /// Perform a raw calculation for the Nth value of
 /// a math machine. This function executes without
 /// doing any caching operations.
-pub fn raw_calculate<T, I, MM>(mm: &mut Machine<T, I, MM>, n: I) -> MachineResult<T>
+pub fn raw_calculate<T, I, MM>(mm: &Machine<T, I, MM>, n: I) -> MachineResult<T>
 where
     T: Clone + Debug + Default + Ord,
     I: Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq,
@@ -182,7 +183,7 @@ where
 
 impl Calculator<MMInt, MMInt> for Fibonacci {
     type Calculated = Phase<MMInt, MMInt>;
-    fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
+    fn calculate(&self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
         let (start, stahp) = (&mut phase.input().to_owned(), n);
         phase.setinput(n);
         for _ in *start..stahp {
@@ -238,7 +239,7 @@ impl Primes {
 
 impl Calculator<MMInt, MMInt> for Primes {
     type Calculated = Phase<MMInt, MMInt>;
-    fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
+    fn calculate(&self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
         let (start, stahp) = (phase.input().to_owned(), n);
         phase.setinput(n);
         for _ in start..stahp {

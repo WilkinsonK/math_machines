@@ -59,10 +59,10 @@ where
         self.cache.drop_invalid(|_| true)
     }
     fn is_too_big(&mut self) -> bool {
-        self.max_entry_cap() >= self.cache.len()
+        self.cache.len() >= self.max_entry_cap()
     }
     fn is_too_old(&mut self) -> bool {
-        self.max_usage_age() >= self.cache.highest_usage()
+        self.cache.highest_usage() >= self.max_usage_age()
     }
     fn lookup(&mut self, n: I) -> CacheResult<Phase<T, I>> {
         self.cache.find_closest(n)
@@ -163,7 +163,7 @@ where
     MM: Calculator<T, I>,
 {
     if mm.is_too_big() || mm.is_too_old() {
-        let _ = mm.drop_invalid();
+        let _ = mm.drop_invalid().expect("dropped values");
     }
 }
 

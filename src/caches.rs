@@ -5,28 +5,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::fmt::Debug;
 use std::hash::Hash;
 
-/// Validates that an insert on a `HashMap` was
-/// successful, otherwise panics.
-fn safe_map_insert<K: Clone + Debug + Hash + Ord, V: Clone + Debug>(map: &mut HashMap<K, V>, k: K, v: V) {
-    let old_len = map.len();
-    map.insert(k.clone(), v.clone());
-    let new_len = map.len();
-    if old_len == new_len {
-        panic!("could not insert {k:?}=>{v:?} [old_len={old_len}; new_len={new_len}]");
-    }
-}
-
-/// Validates that an insert on a `BTreeSet` was
-/// successful, otherwise panics.
-fn safe_set_insert<V: Clone + Debug + Ord>(set: &mut BTreeSet<V>, v: V) {
-    let old_len = set.len();
-    set.insert(v.clone());
-    let new_len = set.len();
-    if old_len == new_len {
-        panic!("could not insert {v:?} [old_len={old_len}; new_len={new_len}]");
-    }
-}
-
 /// Alias for Result<T, CacheError>.
 pub type CacheResult<T> = Result<T, CacheError>;
 /// Test cache. Used only for testing purposes.
@@ -79,7 +57,12 @@ pub struct TestCache {
 /// assert_eq!(cache.len(), 3);
 /// assert_eq!(cache.highest_usage(), 3);
 ///
-/// cache.find(*phase1.input());
+/// let found = cache.find(*phase1.input()).expect("calculation phase");
+/// assert_eq!(*found.input(), 8);
+///
+/// let found = cache.find_closest(17).expect("calculation phase");
+/// assert_eq!(*found.input(), 16);
+///
 /// assert_eq!(cache.highest_usage(), 2);
 /// ```
 #[derive(Clone, Debug)]
@@ -122,7 +105,7 @@ pub trait Caches<K: Hash + ?Sized, V: Sized> {
     fn find_closest(&mut self, key: K) -> CacheResult<V>;
     /// Find a match that meets the predicate
     /// searching in reverse order.
-    fn find_rev(&mut self, key: K, pred: impl FnMut(&&V) -> bool) -> CacheResult<V>;
+    fn find_rev(&mut self, pred: impl FnMut(&&V) -> bool) -> CacheResult<V>;
     /// Push a value to the cache at the given
     /// key.
     fn push(&mut self, entry: V);
@@ -156,29 +139,29 @@ impl Caches<u8, u8> for TestCache {
         Ok(retn)
     }
     fn find(&mut self, key: u8) -> CacheResult<u8> {
-        self.find_rev(key, |cached| **cached == key)
+        self.find_rev(|cached| **cached == key)
     }
     fn find_closest(&mut self, key: u8) -> CacheResult<u8> {
         // Find the closest-- would be--
         // preceeding cached phase.
-        self.find_rev(key, |cached| **cached <= key)
+        self.find_rev(|cached| **cached <= key)
     }
-    fn find_rev(&mut self, key: u8, pred: impl FnMut(&&u8) -> bool) -> CacheResult<u8> {
+    fn find_rev(&mut self, pred: impl FnMut(&&u8) -> bool) -> CacheResult<u8> {
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
 
         match iter.find(pred) {
             Some(phase) => {
-                self.usages.insert(key, 0);
+                println!("{phase}");
+                self.usages.insert(*phase, 0);
                 Ok(phase.to_owned())
             },
             None => Err(CacheError::PhaseNotFound)
         }
     }
     fn push(&mut self, entry: u8) {
-        let entry_rc = entry.clone();
-        self.usages.insert(entry_rc.clone(), 0);
-        self.entries.insert(entry_rc.clone());
+        self.usages.insert(entry.clone(), 0);
+        self.entries.insert(entry.clone());
     }
 }
 
@@ -261,29 +244,29 @@ where
         Ok(retn)
     }
     fn find(&mut self, key: I) -> CacheResult<Self::Cached> { 
-        self.find_rev(key, |ph| *ph.input() == key)
+        self.find_rev(|ph| *ph.input() == key)
     }
     fn find_closest(&mut self, key: I) -> CacheResult<Self::Cached> {
         // Find the closest-- would be--
         // preceeding cached phase.
-        self.find_rev(key, |ph| ph.input() <= &key)
+        self.find_rev(|ph| ph.input() <= &key)
     }
-    fn find_rev(&mut self, key: I, pred: impl FnMut(&&Self::Cached) -> bool) -> CacheResult<Self::Cached> {
+    fn find_rev(&mut self, pred: impl FnMut(&&Self::Cached) -> bool) -> CacheResult<Self::Cached> {
         let entries_clone = self.entries.clone();
         let mut iter      = entries_clone.iter().rev();
 
         match iter.find(pred) {
             Some(phase) => {
                 self.update_usage(|_| true);
-                self.usages.insert(key, 0);
+                self.usages.insert(*phase.input(), 0);
                 Ok(phase.to_owned())
             },
             None => Err(CacheError::PhaseNotFound)
         }
     }
     fn push(&mut self, entry: Self::Cached) {
-        safe_map_insert(&mut self.usages, entry.input().clone(), 0);
-        safe_set_insert(&mut self.entries, entry.clone());
+        self.entries.insert(entry.clone());
+        self.usages.insert(*entry.input(), 0);
 
         // Filter out entry inputs whose usage
         // count is 0;

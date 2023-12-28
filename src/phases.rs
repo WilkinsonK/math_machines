@@ -2,6 +2,8 @@ use std::fmt::{Debug, Display};
 use std::ops::{Index, IndexMut};
 use std::slice::SliceIndex;
 
+use ordered_float::OrderedFloat;
+
 const PHASE_SIZE: MMSize = 3;
 
 /// Type can create a new instance of itself.
@@ -13,7 +15,7 @@ pub trait Newable {
 pub type MMInt = u128;
 /// Variable type alias for the size of float
 /// math machines use.
-pub type MMFlt = f64;
+pub type MMFlt = OrderedFloat<f64>;
 /// Variable type alias for the `size` type
 /// math machines use.
 pub type MMSize = usize;

@@ -8,10 +8,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-C instrument-coverage"
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
@@ -20,3 +20,18 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+
+  coverage:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install cargo-llvm-cov
+      run: taiki-e/install-action@cargo-llvm-cov
+    - name: Generate code coverage
+      run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.info
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        files: codecov.info
+        fail_ci_if_error: true

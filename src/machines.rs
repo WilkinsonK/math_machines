@@ -49,7 +49,7 @@ where
     /// Create a new instance of `Machine`.
     pub fn new(machine: MM, max_entries: MMSize, max_age: MMSize) -> Self {
         Machine{
-            cache: MachineCache::default(),
+            cache: MachineCache::new(),
             machine: machine,
             max_entry_cap: max_entries,
             max_usage_age: max_age
@@ -64,7 +64,7 @@ where
     fn is_too_old(&mut self) -> bool {
         self.max_usage_age() >= self.cache.highest_usage()
     }
-    fn lookup(&mut self, n: &I) -> CacheResult<Phase<T, I>> {
+    fn lookup(&mut self, n: I) -> CacheResult<Phase<T, I>> {
         self.cache.find_closest(n)
     }
     fn max_entry_cap(&mut self) -> MMSize {
@@ -73,8 +73,9 @@ where
     fn max_usage_age(&mut self) -> MMSize {
         self.max_usage_age
     }
-    fn update(&mut self, phase: &Phase<T, I>) {
-        self.cache.push(&phase.clone())
+    fn update(&mut self, phase: Phase<T, I>) {
+        let ret = self.cache.push(phase.clone());
+        ret
     }
 }
 
@@ -148,7 +149,7 @@ where
 {
     match mm.calculate(n, phase) {
         Ok(calc) => {
-            mm.update(&calc);
+            mm.update(calc.clone());
             Ok(calc.result().to_owned())
         },
         Err(m) => Err(m)
@@ -172,7 +173,7 @@ where
     I: Clone + Copy + Debug + Default + Eq + Hash + Ord + PartialEq,
     MM: Calculator<T, I>,
 {
-    if let Ok(p) = mm.lookup(&n) {
+    if let Ok(p) = mm.lookup(n) {
         p.to_owned()
     } else {
         Phase::new()
@@ -183,7 +184,7 @@ impl Calculator<MMInt, MMInt> for Fibonacci {
     type Calculated = Phase<MMInt, MMInt>;
     fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
         let (start, stahp) = (&mut phase.input().to_owned(), n);
-        phase.setinput(&n);
+        phase.setinput(n);
         for _ in *start..stahp {
             phase.rotate(1);
             phase[0] = cmp::max(1, phase[1] + phase[2]);
@@ -239,7 +240,7 @@ impl Calculator<MMInt, MMInt> for Primes {
     type Calculated = Phase<MMInt, MMInt>;
     fn calculate(&mut self, n: MMInt, phase: &mut Self::Calculated) -> MachineResult<Self::Calculated> {
         let (start, stahp) = (phase.input().to_owned(), n);
-        phase.setinput(&n);
+        phase.setinput(n);
         for _ in start..stahp {
             phase[0] = Primes::next_prime(phase[0]);
         }

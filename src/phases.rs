@@ -54,7 +54,7 @@ impl<T: Default, I: Default> Phase<T, I> {
         self.phase.rotate_right(k)
     }
     /// Set the input of this phase.
-    pub fn setinput(&mut self, n: &I)
+    pub fn setinput(&mut self, n: I)
     where
         I: Copy
     {

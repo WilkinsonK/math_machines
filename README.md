@@ -1,5 +1,8 @@
 # Math Machines #
 
+![GitHub License](https://img.shields.io/github/license/WilkinsonK/math_machines)
+![GitHub Workflow Status (with event)](https://img.shields.io/github/actions/workflow/status/WilkinsonK/math_machines/rust.yml)
+
 Math machines is a small collection of mathematical sequences expressed in the
 form of methods to calculate the **Nth** number of a sequence.
 

@@ -21,6 +21,7 @@ for _ in 0..50 {
 
 ### sequences currently supported ###
 - Fibonacci sequence
+- Harmonic series
 - Primes sequence
 
 Machines that are defined in this project caches results at runtime using an
